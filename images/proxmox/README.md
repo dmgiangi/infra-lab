@@ -7,6 +7,7 @@ This directory contains configuration for preparing a Proxmox VE ISO with automa
 | File | Purpose |
 | --- | --- |
 | `answer.toml` | Proxmox automated installer answers |
+| `first-boot.sh` | First-boot hook that enables `snippets` content on the `local` storage |
 | `prepare_proxmox_usb.py` | Downloads the ISO, customizes it with `answer.toml`, and optionally writes it to USB |
 
 ## Prerequisites
@@ -38,6 +39,7 @@ The wizard asks for:
 - Proxmox ISO URL;
 - checksum SHA256;
 - file `answer.toml`;
+- first-boot hook script;
 - build directory;
 - root password to inject as `root-password-hashed`;
 - whether to write the ISO to a USB drive.
@@ -81,6 +83,14 @@ python3 prepare_proxmox_usb.py \
 
 The script does not modify `answer.toml`: it generates `build/answer.generated.toml` with `root-password-hashed` and uses that file to prepare the ISO.
 
+The prepared ISO also includes `first-boot.sh`. On the first boot after Proxmox installation, it runs:
+
+```bash
+pvesm set local --content backup,iso,vztmpl,snippets,import
+```
+
+This makes the `local` storage usable for Terraform cloud-init snippets.
+
 ## Customization
 
 Before use, edit `answer.toml`:
@@ -89,6 +99,7 @@ Before use, edit `answer.toml`:
 - `root-ssh-keys`;
 - network configuration;
 - target disk filter or list.
+- first-boot storage content configuration in `first-boot.sh`.
 
 To manually validate the final configuration, generate the ISO with the script and then validate the generated file:
 

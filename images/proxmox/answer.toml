@@ -25,3 +25,9 @@ source = "from-dhcp"
 filesystem = "ext4"
 # Target disk. Change for the server, for example "sda", "nvme0n1", or use a filter.
 disk-list = ["sda"]
+
+[first-boot]
+# Run a script included in the ISO after the first boot.
+source = "from-iso"
+# Run after the system is fully booted so Proxmox services are available.
+ordering = "fully-up"

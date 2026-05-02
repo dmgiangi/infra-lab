@@ -17,6 +17,7 @@ from pathlib import Path
 
 DEFAULT_BUILD_DIR = Path(__file__).resolve().parent / "build"
 DEFAULT_ANSWER_FILE = Path(__file__).resolve().parent / "answer.toml"
+DEFAULT_FIRST_BOOT_FILE = Path(__file__).resolve().parent / "first-boot.sh"
 DEFAULT_ISO_URL = "https://enterprise.proxmox.com/iso/proxmox-ve_9.1-1.iso"
 DEFAULT_ISO_SHA256 = "6d8f5afc78c0c66812d7272cde7c8b98be7eb54401ceb045400db05eb5ae6d22"
 
@@ -46,6 +47,12 @@ def parse_args() -> argparse.Namespace:
         "--sha256",
         default=None,
         help="Optional expected SHA256 checksum for the downloaded ISO.",
+    )
+    parser.add_argument(
+        "--first-boot-file",
+        type=Path,
+        default=DEFAULT_FIRST_BOOT_FILE,
+        help="Path to the first-boot hook script included in the Proxmox ISO.",
     )
     password_group = parser.add_mutually_exclusive_group()
     password_group.add_argument(
@@ -140,6 +147,7 @@ def run_wizard(args: argparse.Namespace) -> argparse.Namespace:
         args.sha256 = None
 
     args.answer_file = prompt_path("Answer file", args.answer_file, required=True)
+    args.first_boot_file = prompt_path("First-boot hook file", args.first_boot_file, required=True)
     args.build_dir = prompt_path("Build directory", args.build_dir, required=True)
 
     if not args.prompt_root_password and not args.root_password_env:
@@ -211,6 +219,14 @@ def validate_answer(answer_file: Path) -> None:
         ["proxmox-auto-install-assistant", "validate-answer", str(answer_file)],
         check=True,
     )
+
+
+def resolve_first_boot_file(path: Path) -> Path | None:
+    first_boot_file = path.resolve()
+    if not first_boot_file.exists():
+        print(f"First-boot hook file not found, skipping: {first_boot_file}")
+        return None
+    return first_boot_file
 
 
 def read_root_password(args: argparse.Namespace) -> str | None:
@@ -315,26 +331,25 @@ def resolve_answer_file(args: argparse.Namespace, build_dir: Path) -> Path:
     return render_answer_with_password_hash(answer_file, generated_answer, password_hash)
 
 
-def prepare_iso(source_iso: Path, answer_file: Path, output_iso: Path) -> None:
+def prepare_iso(source_iso: Path, answer_file: Path, first_boot_file: Path | None, output_iso: Path) -> None:
     if output_iso.exists():
         print(f"Using existing prepared ISO: {output_iso}")
         return
 
     print(f"Preparing automated installer ISO: {output_iso}")
-    subprocess.run(
-        [
-            "proxmox-auto-install-assistant",
-            "prepare-iso",
-            str(source_iso),
-            "--fetch-from",
-            "iso",
-            "--answer-file",
-            str(answer_file),
-            "--output",
-            str(output_iso),
-        ],
-        check=True,
-    )
+    command = [
+        "proxmox-auto-install-assistant",
+        "prepare-iso",
+        str(source_iso),
+        "--fetch-from",
+        "iso",
+        "--answer-file",
+        str(answer_file),
+    ]
+    if first_boot_file is not None:
+        command.extend(["--on-first-boot", str(first_boot_file)])
+    command.extend(["--output", str(output_iso)])
+    subprocess.run(command, check=True)
 
 
 def assert_usb_device(device: str) -> None:
@@ -390,6 +405,7 @@ def main() -> int:
     build_dir = args.build_dir.resolve()
     build_dir.mkdir(parents=True, exist_ok=True)
     answer_file = resolve_answer_file(args, build_dir)
+    first_boot_file = resolve_first_boot_file(args.first_boot_file)
 
     source_iso = build_dir / filename_from_url(args.iso_url)
     prepared_iso = build_dir / source_iso.name.replace(".iso", "-autoinstall.iso")
@@ -397,7 +413,7 @@ def main() -> int:
     download_iso(args.iso_url, source_iso)
     verify_checksum(source_iso, args.sha256)
     validate_answer(answer_file)
-    prepare_iso(source_iso, answer_file, prepared_iso)
+    prepare_iso(source_iso, answer_file, first_boot_file, prepared_iso)
 
     if args.usb_device:
         write_usb(prepared_iso, args.usb_device, args.yes)
