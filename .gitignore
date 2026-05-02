@@ -1,3 +1,21 @@
 .venv
 .idea
 *.iml
+__pycache__/
+
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Generated installation images
+images/proxmox/build/
+images/proxmox/*.iso
