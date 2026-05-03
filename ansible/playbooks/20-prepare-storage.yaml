@@ -1,0 +1,45 @@
+---
+- name: Prepare local data disk for Kubernetes persistent volumes
+  hosts: kube_workers
+  gather_facts: true
+
+  tasks:
+    - name: Check whether local data disk preparation is enabled
+      ansible.builtin.meta: end_host
+      when: not storage_data_disk_enabled | bool
+
+    - name: Check that the data disk exists
+      ansible.builtin.stat:
+        path: "{{ storage_data_disk_device }}"
+      register: data_disk
+
+    - name: Fail when the configured data disk is missing
+      ansible.builtin.fail:
+        msg: "Data disk {{ storage_data_disk_device }} does not exist on {{ inventory_hostname }}"
+      when: not data_disk.stat.exists
+
+    - name: Check existing filesystem on the data disk
+      ansible.builtin.command: "blkid -o value -s TYPE {{ storage_data_disk_device }}"
+      register: data_disk_blkid
+      failed_when: false
+      changed_when: false
+
+    - name: Create filesystem on the data disk
+      ansible.builtin.command: "mkfs.{{ storage_data_disk_fstype }} -F {{ storage_data_disk_device }}"
+      when: data_disk_blkid.rc != 0
+
+    - name: Create Kubernetes storage mount point
+      ansible.builtin.file:
+        path: "{{ storage_data_disk_mount }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Mount Kubernetes storage data disk
+      ansible.posix.mount:
+        path: "{{ storage_data_disk_mount }}"
+        src: "{{ storage_data_disk_device }}"
+        fstype: "{{ storage_data_disk_fstype }}"
+        opts: defaults,noatime
+        state: mounted

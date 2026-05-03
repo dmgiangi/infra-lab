@@ -16,6 +16,9 @@ resource "proxmox_download_file" "ubuntu_cloud_image" {
 
 # Cloud-init user-data snippet applied to every VM.
 resource "proxmox_virtual_environment_file" "cloud_init_user_data" {
+  # Creates one cloud-init snippet per VM so each guest receives its own hostname.
+  for_each = var.vms
+
   # Snippets are used by Proxmox as custom cloud-init user-data files.
   content_type = "snippets"
   # Datastore where the snippet is stored.
@@ -26,10 +29,11 @@ resource "proxmox_virtual_environment_file" "cloud_init_user_data" {
   # Raw cloud-init content rendered from a local template.
   source_raw {
     data = templatefile("${path.module}/cloud-init/user-data.yaml.tftpl", {
+      hostname            = each.key
       ssh_username        = var.ssh_username
       ssh_authorized_keys = var.ssh_authorized_keys
     })
-    file_name = "k8s-user-data.yaml"
+    file_name = "${each.key}-user-data.yaml"
   }
 }
 
@@ -117,7 +121,7 @@ resource "proxmox_virtual_environment_vm" "vm" {
   # Native Proxmox cloud-init configuration.
   initialization {
     # Custom cloud-init user-data installs packages needed before Ansible runs.
-    user_data_file_id = proxmox_virtual_environment_file.cloud_init_user_data.id
+    user_data_file_id = proxmox_virtual_environment_file.cloud_init_user_data[each.key].id
 
     # Use DHCP by default; static IPs can be added later per VM if needed.
     ip_config {

@@ -1,0 +1,23 @@
+---
+- name: Install Flannel CNI
+  hosts: kube_control_plane
+  gather_facts: false
+  run_once: true
+
+  tasks:
+    - name: Check whether Flannel is already installed
+      ansible.builtin.command: kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-flannel get daemonset kube-flannel-ds
+      register: flannel_status
+      failed_when: false
+      changed_when: false
+
+    - name: Install Flannel manifest
+      ansible.builtin.command:
+        cmd: "kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f {{ flannel_manifest_url }}"
+      when: flannel_status.rc != 0
+
+    - name: Wait for Flannel daemonset rollout
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig /etc/kubernetes/admin.conf -n kube-flannel rollout status daemonset/kube-flannel-ds --timeout=180s
+      changed_when: false
+      when: flannel_status.rc != 0

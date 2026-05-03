@@ -1,0 +1,24 @@
+all:
+  vars:
+    ansible_user: dmgiangi
+    ansible_ssh_private_key_file: ~/.ssh/github_id
+
+  children:
+    kube_cluster:
+      children:
+        kube_control_plane:
+        kube_workers:
+
+    kube_control_plane:
+      hosts:
+        k8s-control-01:
+          ansible_host: 192.168.0.110
+          node_role: control-plane
+          storage_data_disk_enabled: false
+
+    kube_workers:
+      hosts:
+        k8s-worker-01:
+          ansible_host: 192.168.0.120
+          node_role: worker
+          storage_data_disk_enabled: true

@@ -1,0 +1,21 @@
+---
+- name: Check cluster node access
+  ansible.builtin.import_playbook: 00-check-connectivity.yaml
+
+- name: Prepare base operating system settings
+  ansible.builtin.import_playbook: 10-prepare-nodes.yaml
+
+- name: Prepare local Kubernetes storage
+  ansible.builtin.import_playbook: 20-prepare-storage.yaml
+
+- name: Install container runtime and Kubernetes tools
+  ansible.builtin.import_playbook: 30-install-kubernetes-tools.yaml
+
+- name: Initialize Kubernetes control plane
+  ansible.builtin.import_playbook: 40-init-control-plane.yaml
+
+- name: Install Flannel CNI
+  ansible.builtin.import_playbook: 45-install-flannel.yaml
+
+- name: Join Kubernetes workers
+  ansible.builtin.import_playbook: 50-join-workers.yaml

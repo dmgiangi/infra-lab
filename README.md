@@ -9,7 +9,7 @@ Repository for preparing a local Kubernetes environment made of virtual machines
 | `images/` | Installation image preparation for the local server | [images/README.md](images/README.md) |
 | `terraform/` | VM creation on the local server | [terraform/README.md](terraform/README.md) |
 | `scripts/` | Local helper scripts for workstation configuration | [scripts/README.md](scripts/README.md) |
-| `ansible/` | Node provisioning and system component installation | To be added |
+| `ansible/` | Node provisioning and system component installation | [ansible/README.md](ansible/README.md) |
 | `kubernetes/` | Kubernetes application resources and manifests | To be added |
 
 ## Expected Flow

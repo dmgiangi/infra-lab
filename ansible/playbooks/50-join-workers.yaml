@@ -1,0 +1,23 @@
+---
+- name: Join Kubernetes worker nodes
+  hosts: kube_workers
+  gather_facts: true
+
+  tasks:
+    - name: Check whether worker already joined the cluster
+      ansible.builtin.stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf
+
+    - name: Read local kubeadm join command
+      ansible.builtin.slurp:
+        src: "{{ kubernetes_join_command_artifact }}"
+      register: kubeadm_join_command_artifact
+      delegate_to: localhost
+      become: false
+      when: not kubelet_conf.stat.exists
+
+    - name: Join worker to the cluster
+      ansible.builtin.command:
+        cmd: "{{ (kubeadm_join_command_artifact.content | b64decode).splitlines() | select('match', '^kubeadm join ') | first }}"
+      when: not kubelet_conf.stat.exists

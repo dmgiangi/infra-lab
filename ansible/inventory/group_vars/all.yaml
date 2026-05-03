@@ -1,0 +1,54 @@
+---
+# Pod network used by the CNI plugin. It must not overlap with the LAN.
+kubernetes_pod_cidr: 10.244.0.0/16
+
+# Service network used by Kubernetes virtual services.
+kubernetes_service_cidr: 10.96.0.0/12
+
+# API server advertise address used by kubeadm init.
+kubernetes_apiserver_advertise_address: 192.168.0.110
+
+# Local directory for generated kubeconfig and join command artifacts.
+kubernetes_artifacts_dir: "{{ playbook_dir }}/../artifacts"
+kubernetes_kubeconfig_artifact: "{{ kubernetes_artifacts_dir }}/admin.conf"
+kubernetes_join_command_artifact: "{{ kubernetes_artifacts_dir }}/kubeadm-join-command.sh"
+
+# Flannel manifest used for the initial CNI installation.
+flannel_manifest_url: https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+
+# Local data disk prepared for Kubernetes persistent volumes.
+storage_data_disk_device: /dev/vdb
+storage_data_disk_mount: /var/lib/k8s-storage
+storage_data_disk_fstype: ext4
+
+# Kernel modules required by Kubernetes networking and containerd.
+kubernetes_kernel_modules:
+  - overlay
+  - br_netfilter
+
+# Sysctl values required by Kubernetes networking.
+kubernetes_sysctl_values:
+  net.bridge.bridge-nf-call-iptables: "1"
+  net.bridge.bridge-nf-call-ip6tables: "1"
+  net.ipv4.ip_forward: "1"
+
+# Base packages useful before installing Kubernetes components.
+kubernetes_base_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gnupg
+
+# Kubernetes minor version used by the pkgs.k8s.io apt repository.
+kubernetes_minor_version: "1.35"
+
+# Kubernetes packages installed on every node and pinned after installation.
+kubernetes_packages:
+  - kubelet
+  - kubeadm
+  - kubectl
+
+# Container runtime used by kubelet through CRI.
+container_runtime_package: containerd
+containerd_config_path: /etc/containerd/config.toml
+containerd_service_name: containerd

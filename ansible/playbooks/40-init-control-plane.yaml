@@ -1,0 +1,64 @@
+---
+- name: Initialize Kubernetes control plane
+  hosts: kube_control_plane
+  gather_facts: true
+  run_once: true
+
+  tasks:
+    - name: Create local artifacts directory
+      ansible.builtin.file:
+        path: "{{ kubernetes_artifacts_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      become: false
+
+    - name: Check whether the control plane is already initialized
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubernetes_admin_conf
+
+    - name: Initialize the control plane
+      ansible.builtin.command:
+        cmd: >-
+          kubeadm init
+          --apiserver-advertise-address={{ kubernetes_apiserver_advertise_address }}
+          --pod-network-cidr={{ kubernetes_pod_cidr }}
+          --service-cidr={{ kubernetes_service_cidr }}
+      when: not kubernetes_admin_conf.stat.exists
+
+    - name: Create kubeconfig directory for the SSH user
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0700"
+
+    - name: Install kubeconfig for the SSH user on the control plane
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0600"
+        remote_src: true
+
+    - name: Fetch kubeconfig for local kubectl access
+      ansible.builtin.fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ kubernetes_kubeconfig_artifact }}"
+        flat: true
+
+    - name: Generate kubeadm join command
+      ansible.builtin.command: kubeadm token create --print-join-command
+      changed_when: false
+      register: kubeadm_join_command
+
+    - name: Save kubeadm join command locally
+      ansible.builtin.copy:
+        dest: "{{ kubernetes_join_command_artifact }}"
+        mode: "0600"
+        content: "{{ kubeadm_join_command.stdout }}\n"
+      delegate_to: localhost
+      become: false

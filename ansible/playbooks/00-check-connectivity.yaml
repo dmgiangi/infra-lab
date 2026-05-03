@@ -1,0 +1,19 @@
+---
+- name: Check SSH connectivity and sudo access
+  hosts: kube_cluster
+  gather_facts: false
+
+  tasks:
+    - name: Wait for SSH to be reachable
+      ansible.builtin.wait_for_connection:
+        timeout: 60
+
+    - name: Verify sudo access
+      ansible.builtin.command: whoami
+      changed_when: false
+      register: sudo_user
+
+    - name: Show privilege escalation result
+      ansible.builtin.debug:
+        msg: "Connected to {{ inventory_hostname }} as root through sudo"
+      when: sudo_user.stdout == "root"
