@@ -27,7 +27,7 @@ spec:
       pullPolicy: IfNotPresent
     mcImage:
       repository: quay.io/minio/mc
-      tag: RELEASE.2025-09-07T16-13-09Z-cpuv1
+      tag: RELEASE.2025-08-13T08-35-41Z-cpuv1
       pullPolicy: IfNotPresent
     mode: standalone
     replicas: 1
