@@ -48,3 +48,32 @@ k8s-worker-01:/var/lib/k8s-storage
 ```
 
 The control-plane node is explicitly configured with no provisioning paths, so PVC-backed workloads should run on worker nodes.
+
+## MinIO
+
+MinIO is installed through the `minio` Helm chart from:
+
+```text
+https://charts.min.io/
+```
+
+The release runs in standalone mode:
+
+```text
+namespace: minio
+storageClass: local-path
+size: 20Gi
+node: k8s-worker-01
+```
+
+Root credentials are stored in the SOPS-encrypted Secret:
+
+```text
+kubernetes/apps/minio/secrets.enc.yaml
+```
+
+To decrypt or edit it locally:
+
+```bash
+sops kubernetes/apps/minio/secrets.enc.yaml
+```

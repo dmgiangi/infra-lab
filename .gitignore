@@ -19,3 +19,6 @@ override.tf.json
 # Generated installation images
 images/proxmox/build/
 images/proxmox/*.iso
+
+# Plaintext secret templates
+kubernetes/**/*.secret.yaml
