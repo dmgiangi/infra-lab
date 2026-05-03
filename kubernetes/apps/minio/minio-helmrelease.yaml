@@ -21,6 +21,10 @@ spec:
   upgrade:
     cleanupOnFail: true
   values:
+    image:
+      repository: quay.io/minio/minio
+      tag: RELEASE.2025-09-07T16-13-09Z-cpuv1
+      pullPolicy: IfNotPresent
     mode: standalone
     replicas: 1
     existingSecret: minio-root-credentials
