@@ -49,6 +49,18 @@ k8s-worker-01:/var/lib/k8s-storage
 
 The control-plane node is explicitly configured with no provisioning paths, so PVC-backed workloads should run on worker nodes.
 
+## Networking
+
+The home cluster uses MetalLB in Layer 2 mode for LAN `LoadBalancer` services.
+
+The configured address pool is:
+
+```text
+192.168.0.230-192.168.0.239
+```
+
+These addresses must stay outside the router DHCP pool. MetalLB does not create Linux network interfaces for these IPs; it advertises them on the LAN with ARP from one of the Kubernetes nodes.
+
 ## MinIO
 
 MinIO is installed through the `minio` Helm chart from:
