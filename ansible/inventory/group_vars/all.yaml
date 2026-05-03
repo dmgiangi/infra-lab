@@ -52,3 +52,10 @@ kubernetes_packages:
 container_runtime_package: containerd
 containerd_config_path: /etc/containerd/config.toml
 containerd_service_name: containerd
+
+# Flux GitOps bootstrap configuration.
+flux_github_owner: dmgiangi
+flux_github_repository: infra-lab
+flux_github_branch: master
+flux_github_path: ./kubernetes/clusters/home
+flux_github_personal: true

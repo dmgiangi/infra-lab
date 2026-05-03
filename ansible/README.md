@@ -39,6 +39,7 @@ Initial VM access, hostnames, and `qemu-guest-agent` are handled by Terraform Cl
 | `playbooks/40-init-control-plane.yaml` | `kubeadm init`, kubeconfig fetch, and join command generation |
 | `playbooks/45-install-flannel.yaml` | Flannel CNI installation |
 | `playbooks/50-join-workers.yaml` | Worker node join |
+| `playbooks/60-bootstrap-flux.yaml` | Flux bootstrap from GitHub |
 | `playbooks/site.yaml` | Runs the current preparation flow |
 
 ## Prerequisites
@@ -129,3 +130,22 @@ Flannel is installed as the initial CNI. The configured pod CIDR is:
 ```yaml
 kubernetes_pod_cidr: 10.244.0.0/16
 ```
+
+## Flux
+
+Flux is bootstrapped from GitHub with:
+
+```bash
+GITHUB_TOKEN=REPLACE_WITH_TOKEN ansible-playbook playbooks/60-bootstrap-flux.yaml
+```
+
+The playbook uses:
+
+```yaml
+flux_github_owner: dmgiangi
+flux_github_repository: infra-lab
+flux_github_branch: master
+flux_github_path: ./kubernetes/clusters/home
+```
+
+The GitHub token is required only on the workstation running the bootstrap. The default bootstrap mode uses a GitHub deploy key: Flux stores the generated private key in the cluster as the `flux-system` secret in the `flux-system` namespace, and GitHub stores the matching public key as a repository deploy key.

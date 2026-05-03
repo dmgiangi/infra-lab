@@ -1,0 +1,35 @@
+---
+- name: Bootstrap Flux from GitHub
+  hosts: localhost
+  gather_facts: false
+  become: false
+
+  tasks:
+    - name: Check flux CLI availability
+      ansible.builtin.command: flux --version
+      changed_when: false
+
+    - name: Check kubectl cluster access
+      ansible.builtin.command: kubectl get nodes
+      changed_when: false
+
+    - name: Verify GitHub token is available for bootstrap
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.env', 'GITHUB_TOKEN') | length > 0
+        fail_msg: "Set GITHUB_TOKEN in the local environment before running Flux bootstrap."
+        success_msg: "GITHUB_TOKEN is available for Flux bootstrap."
+
+    - name: Bootstrap Flux with GitHub deploy key authentication
+      ansible.builtin.command:
+        argv:
+          - flux
+          - bootstrap
+          - github
+          - "--owner={{ flux_github_owner }}"
+          - "--repository={{ flux_github_repository }}"
+          - "--branch={{ flux_github_branch }}"
+          - "--path={{ flux_github_path }}"
+          - "--personal={{ flux_github_personal | string | lower }}"
+      environment:
+        GITHUB_TOKEN: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}"
