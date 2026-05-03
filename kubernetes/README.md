@@ -33,11 +33,13 @@ After Flux is bootstrapped, permanent Kubernetes changes should be made through 
 
 ## Storage
 
-The home cluster uses `local-path-provisioner` with this StorageClass:
+The home cluster uses `local-path-provisioner` through a Flux `HelmRelease`, with this StorageClass:
 
 ```text
 local-path
 ```
+
+The Helm chart source is pinned to the upstream repository tag `v0.0.35`.
 
 The provisioner stores dynamically created volumes on:
 
