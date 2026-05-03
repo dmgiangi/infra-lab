@@ -30,3 +30,19 @@ The bootstrap uses GitHub deploy key authentication. The GitHub token is used on
 ## Apply Model
 
 After Flux is bootstrapped, permanent Kubernetes changes should be made through Git commits under this directory instead of direct `kubectl apply`.
+
+## Storage
+
+The home cluster uses `local-path-provisioner` with this StorageClass:
+
+```text
+local-path
+```
+
+The provisioner stores dynamically created volumes on:
+
+```text
+k8s-worker-01:/var/lib/k8s-storage
+```
+
+The control-plane node is explicitly configured with no provisioning paths, so PVC-backed workloads should run on worker nodes.
