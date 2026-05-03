@@ -59,3 +59,8 @@ flux_github_repository: infra-lab
 flux_github_branch: master
 flux_github_path: ./kubernetes/clusters/home
 flux_github_personal: true
+
+# SOPS age decryption secret used by Flux.
+sops_age_key_file: ~/.config/sops/age/keys.txt
+sops_age_secret_name: sops-age
+sops_age_secret_namespace: flux-system

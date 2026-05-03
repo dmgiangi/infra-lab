@@ -1,0 +1,41 @@
+---
+- name: Configure Flux SOPS age decryption key
+  hosts: localhost
+  gather_facts: false
+  become: false
+
+  tasks:
+    - name: Resolve local age key path
+      ansible.builtin.set_fact:
+        resolved_sops_age_key_file: "{{ sops_age_key_file | expanduser }}"
+
+    - name: Check local age key file
+      ansible.builtin.stat:
+        path: "{{ resolved_sops_age_key_file }}"
+      register: sops_age_key
+      no_log: true
+
+    - name: Fail when local age key file is missing
+      ansible.builtin.fail:
+        msg: "SOPS age key file not found at {{ resolved_sops_age_key_file }}. Generate it with age-keygen and store it outside the repository."
+      when: not sops_age_key.stat.exists
+
+    - name: Check kubectl cluster access
+      ansible.builtin.command: kubectl get namespace "{{ sops_age_secret_namespace }}"
+      changed_when: false
+
+    - name: Create or update Flux SOPS age secret
+      ansible.builtin.shell: |
+        set -euo pipefail
+        kubectl -n "{{ sops_age_secret_namespace }}" create secret generic "{{ sops_age_secret_name }}" \
+          --from-file=age.agekey="{{ resolved_sops_age_key_file }}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+      args:
+        executable: /bin/bash
+      changed_when: "'configured' in sops_age_secret_apply.stdout or 'created' in sops_age_secret_apply.stdout"
+      register: sops_age_secret_apply
+      no_log: true
+
+    - name: Confirm SOPS age secret exists
+      ansible.builtin.command: kubectl -n "{{ sops_age_secret_namespace }}" get secret "{{ sops_age_secret_name }}"
+      changed_when: false
