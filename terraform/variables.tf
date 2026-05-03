@@ -113,7 +113,7 @@ variable "qemu_guest_agent_enabled" {
 variable "vms" {
   # Each map entry represents a VM, indexed by hostname.
   description = "Virtual machines to create."
-  # Required schema for each VM: logical role, CPU, RAM, and disk size.
+  # Required schema for each VM: logical role, CPU, RAM, OS disk, and optional data disk size.
   type = map(object({
     # Logical node role, useful for documentation and future outputs/inventory.
     role = string
@@ -127,5 +127,7 @@ variable "vms" {
     memory_mb = number
     # Main disk size in gigabytes.
     disk_gb = number
+    # Optional data disk size in gigabytes. Null or omitted means no data disk.
+    data_disk_gb = optional(number)
   }))
 }

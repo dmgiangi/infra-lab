@@ -30,19 +30,21 @@ qemu_guest_agent_enabled = true
 # Definition of the VMs to create.
 vms = {
   k8s-control-01 = {
-    role        = "control-plane"
-    vm_id       = 110
-    mac_address = "BC:24:11:00:01:10"
-    vcpu        = 3
-    memory_mb   = 2048
-    disk_gb     = 30
+    role         = "control-plane"
+    vm_id        = 110
+    mac_address  = "BC:24:11:00:01:10"
+    vcpu         = 3
+    memory_mb    = 2048
+    disk_gb      = 15
+    data_disk_gb = null
   }
   k8s-worker-01 = {
-    role        = "worker"
-    vm_id       = 120
-    mac_address = "BC:24:11:00:01:20"
-    vcpu        = 3
-    memory_mb   = 4096
-    disk_gb     = 30
+    role         = "worker"
+    vm_id        = 120
+    mac_address  = "BC:24:11:00:01:20"
+    vcpu         = 3
+    memory_mb    = 4096
+    disk_gb      = 15
+    data_disk_gb = 80
   }
 }

@@ -85,6 +85,25 @@ resource "proxmox_virtual_environment_vm" "vm" {
     size = each.value.disk_gb
   }
 
+  # Optional data disk used later by Ansible for Kubernetes persistent storage.
+  dynamic "disk" {
+    # Create this disk only for VMs that define data_disk_gb.
+    for_each = each.value.data_disk_gb == null ? [] : [each.value.data_disk_gb]
+
+    content {
+      # Store data disks on the same VM datastore unless a separate datastore is added later.
+      datastore_id = var.vm_datastore_id
+      # Secondary VirtIO disk. The guest will normally see it as /dev/vdb.
+      interface = "virtio1"
+      # Enable a dedicated IO thread for better disk performance.
+      iothread = true
+      # Allow discard/TRIM support from the guest.
+      discard = "on"
+      # Data disk size in gigabytes.
+      size = disk.value
+    }
+  }
+
   # VM network interface attached to the Proxmox bridge.
   network_device {
     # Proxmox bridge, typically vmbr0.

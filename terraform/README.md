@@ -1,6 +1,6 @@
 # Terraform
 
-This directory contains Terraform configuration for creating 3 Kubernetes VMs on a Proxmox VE host.
+This directory contains Terraform configuration for creating Kubernetes VMs on a Proxmox VE host.
 
 ## Assumptions
 
@@ -40,6 +40,8 @@ terraform apply
 
 The custom cloud-init user-data installs and starts `qemu-guest-agent` on first boot. `qemu_guest_agent_enabled` is still disabled for initial VM creation so Terraform does not wait for guest-agent data before cloud-init finishes. After the VMs complete first boot, it can be enabled and applied again.
 
+Terraform can also attach an optional secondary data disk to each VM through `data_disk_gb`. The disk is created but not formatted or mounted by Terraform. Future Ansible playbooks will prepare it for Kubernetes persistent storage, for example at `/var/lib/k8s-storage`.
+
 ## Proxmox Credentials
 
 Prefer a dedicated Proxmox API token:
@@ -74,9 +76,9 @@ ssh root@pve-01.lan
 
 The configuration creates the Kubernetes nodes defined in `terraform.tfvars`:
 
-| Name | Role | MAC address | CPU | RAM | Disk |
-| --- | --- | --- | ---: | ---: | ---: |
-| `k8s-control-01` | control-plane | `BC:24:11:00:01:10` | 3 | 2048 MB | 30 GB |
-| `k8s-worker-01` | worker | `BC:24:11:00:01:20` | 3 | 4096 MB | 30 GB |
+| Name | Role | MAC address | CPU | RAM | OS disk | Data disk |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| `k8s-control-01` | control-plane | `BC:24:11:00:01:10` | 3 | 2048 MB | 30 GB | none |
+| `k8s-worker-01` | worker | `BC:24:11:00:01:20` | 3 | 4096 MB | 30 GB | 80 GB |
 
-Sizes and MAC addresses can be changed through the `vms` variable. Use the MAC addresses for DHCP reservations on the router/DHCP server so each VM keeps a stable IP while still using DHCP.
+Sizes, data disks, and MAC addresses can be changed through the `vms` variable. Use the MAC addresses for DHCP reservations on the router/DHCP server so each VM keeps a stable IP while still using DHCP.
