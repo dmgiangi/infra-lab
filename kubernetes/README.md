@@ -165,7 +165,7 @@ Before reconciling this configuration, replace the Azure placeholders in:
 kubernetes/infrastructure/cert-manager/config/letsencrypt-clusterissuers.yaml
 ```
 
-The wildcard certificate currently uses `letsencrypt-staging`. Switch it to `letsencrypt-prod` after the staging issuance path works.
+The wildcard certificate uses `letsencrypt-prod`. Use `letsencrypt-staging` when testing issuer or DNS changes to avoid Let's Encrypt production rate limits.
 
 ## MinIO
 
