@@ -16,6 +16,54 @@ Flux is configured to reconcile:
 ./kubernetes/clusters/home
 ```
 
+## Architecture
+
+This diagram is the source of truth for the current Kubernetes architecture. Update it when adding or removing platform components.
+
+```mermaid
+flowchart TB
+  operator["Operator workstation"]
+  github["GitHub repository<br/>dmgiangi/infra-lab"]
+
+  subgraph cluster["Home Kubernetes cluster"]
+    gitops["Flux GitOps<br/>reconciles kubernetes/clusters/home"]
+
+    subgraph networking["Networking"]
+      metallb["MetalLB<br/>Layer 2 LoadBalancer IPs"]
+      lanPool["LAN pool<br/>192.168.0.230-192.168.0.239"]
+      certManager["cert-manager<br/>Let's Encrypt DNS-01"]
+      azureDns["Azure DNS<br/>calcifer.tech"]
+    end
+
+    subgraph storage["Storage"]
+      storageClass["StorageClass<br/>local-path"]
+      dataPath["Worker storage path<br/>/var/lib/k8s-storage"]
+    end
+
+    subgraph apps["Applications"]
+      minio["MinIO<br/>S3-compatible object storage"]
+    end
+  end
+
+  subgraph nodes["Cluster nodes"]
+    control["k8s-control-01"]
+    worker["k8s-worker-01"]
+  end
+
+  operator -->|"commits"| github
+  github --> gitops
+  gitops --> networking
+  gitops --> storage
+  gitops --> apps
+  minio -->|"PVC"| storageClass
+  storageClass --> dataPath
+  dataPath --> worker
+  metallb --> lanPool
+  certManager -->|"ACME TXT records"| azureDns
+  metallb --> control
+  metallb --> worker
+```
+
 ## Bootstrap
 
 Flux is bootstrapped by Ansible:
@@ -60,6 +108,40 @@ The configured address pool is:
 ```
 
 These addresses must stay outside the router DHCP pool. MetalLB does not create Linux network interfaces for these IPs; it advertises them on the LAN with ARP from one of the Kubernetes nodes.
+
+## TLS Certificates
+
+TLS certificates are managed by `cert-manager` through Let's Encrypt DNS-01 challenges against Azure DNS for:
+
+```text
+calcifer.tech
+```
+
+The initial certificate request is a wildcard certificate:
+
+```text
+*.calcifer.tech
+```
+
+The certificate is stored in the `ingress` namespace as:
+
+```text
+calcifer-tech-wildcard-tls
+```
+
+The Azure DNS client secret is stored in a SOPS-encrypted Secret:
+
+```text
+kubernetes/infrastructure/cert-manager/config/azuredns-credentials.enc.yaml
+```
+
+Before reconciling this configuration, replace the Azure placeholders in:
+
+```text
+kubernetes/infrastructure/cert-manager/config/letsencrypt-clusterissuers.yaml
+```
+
+The wildcard certificate currently uses `letsencrypt-staging`. Switch it to `letsencrypt-prod` after the staging issuance path works.
 
 ## MinIO
 

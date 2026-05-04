@@ -1,0 +1,15 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: calcifer-tech-wildcard
+  namespace: ingress
+spec:
+  secretName: calcifer-tech-wildcard-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-staging
+  commonName: "*.calcifer.tech"
+  dnsNames:
+    - "*.calcifer.tech"
+    - calcifer.tech

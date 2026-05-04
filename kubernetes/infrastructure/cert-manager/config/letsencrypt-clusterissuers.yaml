@@ -1,0 +1,46 @@
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email: dem.gianluigi@gmail.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - dns01:
+          azureDNS:
+            clientID: b4edcd4-8397-4577-8253-3974926a83cc
+            clientSecretSecretRef:
+              name: azuredns-credentials
+              key: client-secret
+            subscriptionID: 1679edc6-fa8e-4210-9607-7b4dfd048934
+            tenantID: 6ab554b0-ff6e-47a0-986c-3bad955c4694
+            resourceGroupName: rg-calcifer-westeurope-001
+            hostedZoneName: calcifer.tech
+            environment: AzurePublicCloud
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: dem.gianluigi@gmail.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          azureDNS:
+            clientID: b4edcd4-8397-4577-8253-3974926a83cc
+            clientSecretSecretRef:
+              name: azuredns-credentials
+              key: client-secret
+            subscriptionID: 1679edc6-fa8e-4210-9607-7b4dfd048934
+            tenantID: 6ab554b0-ff6e-47a0-986c-3bad955c4694
+            resourceGroupName: rg-calcifer-westeurope-001
+            hostedZoneName: calcifer.tech
+            environment: AzurePublicCloud

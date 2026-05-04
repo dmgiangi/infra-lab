@@ -1,0 +1,7 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - azuredns-credentials.enc.yaml
+  - letsencrypt-clusterissuers.yaml
+  - calcifer-tech-wildcard-certificate.yaml
