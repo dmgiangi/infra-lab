@@ -29,6 +29,7 @@ flowchart TB
     gitops["Flux GitOps<br/>reconciles kubernetes/clusters/home"]
 
     subgraph networking["Networking"]
+      kong["Kong Gateway<br/>Gateway API entrypoint"]
       metallb["MetalLB<br/>Layer 2 LoadBalancer IPs"]
       lanPool["LAN pool<br/>192.168.0.230-192.168.0.239"]
       certManager["cert-manager<br/>Let's Encrypt DNS-01"]
@@ -55,9 +56,11 @@ flowchart TB
   gitops --> networking
   gitops --> storage
   gitops --> apps
+  kong -->|"HTTPRoute"| minio
   minio -->|"PVC"| storageClass
   storageClass --> dataPath
   dataPath --> worker
+  metallb -->|"192.168.0.230"| kong
   metallb --> lanPool
   certManager -->|"ACME TXT records"| azureDns
   metallb --> control
@@ -108,6 +111,27 @@ The configured address pool is:
 ```
 
 These addresses must stay outside the router DHCP pool. MetalLB does not create Linux network interfaces for these IPs; it advertises them on the LAN with ARP from one of the Kubernetes nodes.
+
+Kong Gateway is the HTTP/TLS entrypoint for LAN services. Its proxy service uses a fixed MetalLB address:
+
+```text
+192.168.0.230
+```
+
+Initial routes:
+
+| Host | Upstream |
+| --- | --- |
+| `minio.calcifer.tech` | MinIO Console |
+| `s3.calcifer.tech` | MinIO S3 API |
+
+Routing uses Gateway API:
+
+```text
+Gateway: ingress/kong
+HTTPRoute: minio/minio-console
+HTTPRoute: minio/minio-s3
+```
 
 ## TLS Certificates
 

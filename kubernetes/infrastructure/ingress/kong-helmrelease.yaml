@@ -1,0 +1,49 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kong
+  namespace: ingress
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: ingress
+      version: 0.21.0
+      sourceRef:
+        kind: HelmRepository
+        name: kong
+        namespace: flux-system
+      interval: 30m
+  targetNamespace: ingress
+  install:
+    createNamespace: false
+    remediation:
+      retries: 1
+  upgrade:
+    cleanupOnFail: true
+  values:
+    gateway:
+      image:
+        repository: kong
+        tag: "3.9"
+      proxy:
+        type: LoadBalancer
+        loadBalancerIP: 192.168.0.230
+        http:
+          enabled: true
+          servicePort: 80
+          containerPort: 8000
+        tls:
+          enabled: true
+          servicePort: 443
+          containerPort: 8443
+
+    controller:
+      ingressController:
+        image:
+          repository: kong/kubernetes-ingress-controller
+          tag: "3.5"
+        ingressClass: kong
+        env:
+          watch_namespace: ""
