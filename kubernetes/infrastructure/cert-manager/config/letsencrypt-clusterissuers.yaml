@@ -12,7 +12,7 @@ spec:
     solvers:
       - dns01:
           azureDNS:
-            clientID: b4edcd4-8397-4577-8253-3974926a83cc
+            clientID: cb4edcd4-8397-4577-8253-3974926a83cc
             clientSecretSecretRef:
               name: azuredns-credentials
               key: client-secret
@@ -35,7 +35,7 @@ spec:
     solvers:
       - dns01:
           azureDNS:
-            clientID: b4edcd4-8397-4577-8253-3974926a83cc
+            clientID: cb4edcd4-8397-4577-8253-3974926a83cc
             clientSecretSecretRef:
               name: azuredns-credentials
               key: client-secret
