@@ -59,7 +59,7 @@ flux_github_repository: infra-lab
 flux_github_branch: master
 flux_github_path: ./kubernetes/clusters/home
 flux_github_personal: true
-flux_bootstrap_timeout: 2m
+flux_bootstrap_timeout: 10m
 
 # SOPS age decryption secret used by Flux.
 sops_age_key_file: ~/.config/sops/age/keys.txt

@@ -21,15 +21,22 @@
       when: not sops_age_key.stat.exists
 
     - name: Check kubectl cluster access
-      ansible.builtin.command: kubectl get namespace "{{ sops_age_secret_namespace }}"
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_kubeconfig_artifact }}"
+          - get
+          - namespace
+          - "{{ sops_age_secret_namespace }}"
       changed_when: false
 
     - name: Create or update Flux SOPS age secret
       ansible.builtin.shell: |
         set -euo pipefail
-        kubectl -n "{{ sops_age_secret_namespace }}" create secret generic "{{ sops_age_secret_name }}" \
+        kubectl --kubeconfig "{{ kubernetes_kubeconfig_artifact }}" -n "{{ sops_age_secret_namespace }}" create secret generic "{{ sops_age_secret_name }}" \
           --from-file=age.agekey="{{ resolved_sops_age_key_file }}" \
-          --dry-run=client -o yaml | kubectl apply -f -
+          --dry-run=client -o yaml | kubectl --kubeconfig "{{ kubernetes_kubeconfig_artifact }}" apply -f -
       args:
         executable: /bin/bash
       changed_when: "'configured' in sops_age_secret_apply.stdout or 'created' in sops_age_secret_apply.stdout"
@@ -37,13 +44,24 @@
       no_log: true
 
     - name: Confirm SOPS age secret exists
-      ansible.builtin.command: kubectl -n "{{ sops_age_secret_namespace }}" get secret "{{ sops_age_secret_name }}"
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_kubeconfig_artifact }}"
+          - -n
+          - "{{ sops_age_secret_namespace }}"
+          - get
+          - secret
+          - "{{ sops_age_secret_name }}"
       changed_when: false
 
     - name: Enable SOPS decryption on the Flux root Kustomization
       ansible.builtin.command:
         argv:
           - kubectl
+          - --kubeconfig
+          - "{{ kubernetes_kubeconfig_artifact }}"
           - -n
           - "{{ sops_age_secret_namespace }}"
           - patch

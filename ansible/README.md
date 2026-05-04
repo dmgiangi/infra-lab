@@ -85,6 +85,8 @@ kubectl get nodes
 kubectl get pods -A
 ```
 
+The Flux bootstrap and SOPS repair playbooks use `ansible/artifacts/admin.conf` explicitly through `--kubeconfig`; they do not depend on the workstation's default `~/.kube/config`.
+
 ## Storage
 
 `k8s-worker-01` is configured to prepare:
@@ -151,7 +153,7 @@ flux_github_owner: dmgiangi
 flux_github_repository: infra-lab
 flux_github_branch: master
 flux_github_path: ./kubernetes/clusters/home
-flux_bootstrap_timeout: 2m
+flux_bootstrap_timeout: 10m
 ```
 
 Before `flux bootstrap github` runs, the playbook creates the `flux-system` namespace and the `flux-system/sops-age` Secret from the local age key. The repository contains a bootstrap Kustomize patch that enables SOPS decryption on the Flux root Kustomization at install time.
