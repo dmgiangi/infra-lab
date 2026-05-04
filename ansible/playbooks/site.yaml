@@ -19,3 +19,6 @@
 
 - name: Join Kubernetes workers
   ansible.builtin.import_playbook: 50-join-workers.yaml
+
+- name: Bootstrap Flux GitOps
+  ansible.builtin.import_playbook: 60-bootstrap-flux.yaml

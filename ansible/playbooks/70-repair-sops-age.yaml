@@ -1,5 +1,5 @@
 ---
-- name: Configure Flux SOPS age decryption key
+- name: Repair Flux SOPS age decryption configuration
   hosts: localhost
   gather_facts: false
   become: false
@@ -39,3 +39,18 @@
     - name: Confirm SOPS age secret exists
       ansible.builtin.command: kubectl -n "{{ sops_age_secret_namespace }}" get secret "{{ sops_age_secret_name }}"
       changed_when: false
+
+    - name: Enable SOPS decryption on the Flux root Kustomization
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - -n
+          - "{{ sops_age_secret_namespace }}"
+          - patch
+          - kustomization
+          - flux-system
+          - --type=merge
+          - -p
+          - '{"spec":{"decryption":{"provider":"sops","secretRef":{"name":"{{ sops_age_secret_name }}"}}}}'
+      register: flux_sops_decryption_patch
+      changed_when: "'patched' in flux_sops_decryption_patch.stdout"

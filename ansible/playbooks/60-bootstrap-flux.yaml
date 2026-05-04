@@ -13,6 +13,77 @@
       ansible.builtin.command: kubectl get nodes
       changed_when: false
 
+    - name: Resolve local age key path
+      ansible.builtin.set_fact:
+        resolved_sops_age_key_file: "{{ sops_age_key_file | expanduser }}"
+
+    - name: Check local age key file
+      ansible.builtin.stat:
+        path: "{{ resolved_sops_age_key_file }}"
+      register: sops_age_key
+      no_log: true
+
+    - name: Fail when local age key file is missing
+      ansible.builtin.fail:
+        msg: "SOPS age key file not found at {{ resolved_sops_age_key_file }}. Generate it with age-keygen and store it outside the repository."
+      when: not sops_age_key.stat.exists
+
+    - name: Create Flux namespace before bootstrap
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - create
+          - namespace
+          - "{{ sops_age_secret_namespace }}"
+          - --dry-run=client
+          - -o
+          - yaml
+      changed_when: false
+      register: flux_namespace_manifest
+
+    - name: Apply Flux namespace before bootstrap
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - -
+      args:
+        stdin: "{{ flux_namespace_manifest.stdout }}"
+      register: flux_namespace_apply
+      changed_when: "'created' in flux_namespace_apply.stdout or 'configured' in flux_namespace_apply.stdout"
+
+    - name: Create or update Flux SOPS age secret before bootstrap
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - -n
+          - "{{ sops_age_secret_namespace }}"
+          - create
+          - secret
+          - generic
+          - "{{ sops_age_secret_name }}"
+          - "--from-file=age.agekey={{ resolved_sops_age_key_file }}"
+          - --dry-run=client
+          - -o
+          - yaml
+      changed_when: false
+      register: sops_age_secret_manifest
+      no_log: true
+
+    - name: Apply Flux SOPS age secret before bootstrap
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - -
+      args:
+        stdin: "{{ sops_age_secret_manifest.stdout }}"
+      changed_when: "'created' in sops_age_secret_apply.stdout or 'configured' in sops_age_secret_apply.stdout"
+      register: sops_age_secret_apply
+      no_log: true
+
     - name: Verify GitHub token is available for bootstrap
       ansible.builtin.assert:
         that:
@@ -31,5 +102,6 @@
           - "--branch={{ flux_github_branch }}"
           - "--path={{ flux_github_path }}"
           - "--personal={{ flux_github_personal | string | lower }}"
+          - "--timeout={{ flux_bootstrap_timeout }}"
       environment:
         GITHUB_TOKEN: "{{ lookup('ansible.builtin.env', 'GITHUB_TOKEN') }}"
