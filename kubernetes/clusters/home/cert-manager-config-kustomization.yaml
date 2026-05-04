@@ -9,6 +9,10 @@ spec:
   retryInterval: 1m
   path: ./kubernetes/infrastructure/cert-manager/config
   prune: true
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
   sourceRef:
     kind: GitRepository
     name: flux-system
