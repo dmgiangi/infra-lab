@@ -13,5 +13,5 @@ spec:
     - keycloak.calcifer.tech
   rules:
     - backendRefs:
-        - name: keycloak
+        - name: identity-keycloak
           port: 80
