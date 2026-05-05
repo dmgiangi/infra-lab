@@ -40,7 +40,7 @@ spec:
     postgresql:
       enabled: false
     externalDatabase:
-      host: keycloak-postgresql.identity.svc.cluster.local
+      host: identity-keycloak-postgresql.identity.svc.cluster.local
       port: 5432
       user: keycloak
       database: keycloak
