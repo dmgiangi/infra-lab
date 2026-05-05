@@ -43,6 +43,8 @@ flowchart TB
 
     subgraph apps["Applications"]
       minio["MinIO<br/>S3-compatible object storage"]
+      keycloak["Keycloak<br/>Identity provider"]
+      keycloakDb["PostgreSQL<br/>Keycloak database"]
     end
   end
 
@@ -57,7 +59,10 @@ flowchart TB
   gitops --> storage
   gitops --> apps
   kong -->|"HTTPRoute"| minio
+  kong -->|"HTTPRoute"| keycloak
   minio -->|"PVC"| storageClass
+  keycloak --> keycloakDb
+  keycloakDb -->|"PVC"| storageClass
   storageClass --> dataPath
   dataPath --> worker
   metallb -->|"192.168.0.230"| kong
@@ -124,6 +129,7 @@ Initial routes:
 | --- | --- |
 | `minio.calcifer.tech` | MinIO Console |
 | `s3.calcifer.tech` | MinIO S3 API |
+| `keycloak.calcifer.tech` | Keycloak |
 
 Routing uses Gateway API:
 
@@ -131,6 +137,7 @@ Routing uses Gateway API:
 Gateway: ingress/kong
 HTTPRoute: minio/minio-console
 HTTPRoute: minio/minio-s3
+HTTPRoute: identity/keycloak
 ```
 
 ## TLS Certificates
@@ -194,4 +201,29 @@ To decrypt or edit it locally:
 
 ```bash
 sops kubernetes/apps/minio/secrets.enc.yaml
+```
+
+## Keycloak
+
+Keycloak is installed through the Bitnami `keycloak` Helm chart and exposed through Kong Gateway API:
+
+```text
+host: keycloak.calcifer.tech
+namespace: identity
+database: PostgreSQL
+database storageClass: local-path
+database size: 5Gi
+node: k8s-worker-01
+```
+
+The initial admin password and PostgreSQL credentials are stored in the SOPS-encrypted Secret bundle:
+
+```text
+kubernetes/apps/identity/secrets.enc.yaml
+```
+
+To decrypt or edit it locally:
+
+```bash
+sops kubernetes/apps/identity/secrets.enc.yaml
 ```

@@ -6,6 +6,7 @@ resources:
   - gateway-api-crds-kustomization.yaml
   - ingress-stack-kustomization.yaml
   - ingress-config-kustomization.yaml
+  - identity-routes-kustomization.yaml
   - minio-routes-kustomization.yaml
   - metallb-config-kustomization.yaml
   - ../../infrastructure

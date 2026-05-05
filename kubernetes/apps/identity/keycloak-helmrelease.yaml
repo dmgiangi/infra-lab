@@ -1,0 +1,60 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: keycloak
+  namespace: identity
+spec:
+  interval: 30m
+  dependsOn:
+    - name: keycloak-postgresql
+  chart:
+    spec:
+      chart: keycloak
+      version: ">=26.0.0 <27.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bitnami
+        namespace: flux-system
+      interval: 30m
+  targetNamespace: identity
+  install:
+    createNamespace: false
+  upgrade:
+    cleanupOnFail: true
+  values:
+    production: true
+    proxyHeaders: xforwarded
+    hostname: keycloak.calcifer.tech
+    hostnameStrict: true
+    httpEnabled: true
+    auth:
+      adminUser: admin
+      existingSecret: keycloak-admin-credentials
+      passwordSecretKey: admin-password
+    tls:
+      enabled: false
+    postgresql:
+      enabled: false
+    externalDatabase:
+      host: keycloak-postgresql.identity.svc.cluster.local
+      port: 5432
+      user: keycloak
+      database: keycloak
+      existingSecret: keycloak-external-db-credentials
+      existingSecretUserKey: db-user
+      existingSecretPasswordKey: db-password
+    service:
+      type: ClusterIP
+      http:
+        enabled: true
+      ports:
+        http: 80
+    nodeSelector:
+      kubernetes.io/hostname: k8s-worker-01
+    resources:
+      requests:
+        cpu: 250m
+        memory: 768Mi
+      limits:
+        memory: 1536Mi
