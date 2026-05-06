@@ -59,15 +59,15 @@ data:
       ],
       "brokerLoginFlows": [
         {
-          "alias": "calcifer auto link existing user",
-          "description": "Automatically links trusted Google accounts to pre-created users with matching email",
+          "alias": "calcifer password verified link",
+          "description": "Links Google accounts only after re-authenticating the matching local user",
           "executions": [
             {
               "provider": "idp-detect-existing-broker-user",
               "requirement": "REQUIRED"
             },
             {
-              "provider": "idp-auto-link",
+              "provider": "idp-username-password-form",
               "requirement": "REQUIRED"
             }
           ]
@@ -99,7 +99,7 @@ data:
           "providerId": "google",
           "clientId": "851650197434-uchg5tecamvamu0v66h5nv9g4unettnh.apps.googleusercontent.com",
           "clientSecretFile": "/var/run/keycloak-idp/google-client-secret",
-          "firstBrokerLoginFlowAlias": "calcifer auto link existing user",
+          "firstBrokerLoginFlowAlias": "calcifer password verified link",
           "trustEmail": true,
           "syncMode": "FORCE"
         }
