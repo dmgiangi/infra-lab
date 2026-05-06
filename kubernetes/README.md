@@ -129,7 +129,7 @@ Initial routes:
 | --- | --- |
 | `minio.calcifer.tech` | MinIO Console |
 | `s3.calcifer.tech` | MinIO S3 API |
-| `keycloak.calcifer.tech` | Keycloak |
+| `auth.calcifer.tech` | Keycloak |
 
 Routing uses Gateway API:
 
@@ -208,7 +208,7 @@ sops kubernetes/apps/minio/secrets.enc.yaml
 Keycloak is installed through the Bitnami `keycloak` Helm chart and exposed through Kong Gateway API:
 
 ```text
-host: keycloak.calcifer.tech
+host: auth.calcifer.tech
 namespace: identity
 database: PostgreSQL
 database storageClass: local-path
@@ -248,6 +248,12 @@ google identity provider: enabled
 ```
 
 The `admins` group receives both application roles and the `realm-management/realm-admin` client role inside the `calcifer` realm. This allows administration of the application realm without granting global access to the `master` realm.
+
+The Google OAuth client must allow this redirect URI:
+
+```text
+https://auth.calcifer.tech/realms/calcifer/broker/google/endpoint
+```
 
 The Job name is versioned:
 

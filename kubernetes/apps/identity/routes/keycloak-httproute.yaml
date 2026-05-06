@@ -10,7 +10,7 @@ spec:
       namespace: ingress
       sectionName: https
   hostnames:
-    - keycloak.calcifer.tech
+    - auth.calcifer.tech
   rules:
     - backendRefs:
         - name: identity-keycloak

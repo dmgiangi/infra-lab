@@ -28,7 +28,7 @@ spec:
       repository: bitnamilegacy/keycloak
     production: true
     proxyHeaders: xforwarded
-    hostname: keycloak.calcifer.tech
+    hostname: auth.calcifer.tech
     hostnameStrict: true
     httpEnabled: true
     auth:
