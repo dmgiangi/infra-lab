@@ -227,3 +227,33 @@ To decrypt or edit it locally:
 ```bash
 sops kubernetes/apps/identity/secrets.enc.yaml
 ```
+
+Keycloak application configuration is applied by an idempotent Kubernetes Job:
+
+```text
+kubernetes/apps/identity/keycloak-config/
+```
+
+The Job uses the `master/admin` account only as a bootstrap credential, then manages the `calcifer` realm through the Keycloak Admin API.
+
+Initial managed resources:
+
+```text
+realm: calcifer
+realm roles: user, admin
+groups: users, admins
+local test user: dmgiangi
+client: lab-console
+google identity provider: enabled
+```
+
+The `admins` group receives both application roles and the `realm-management/realm-admin` client role inside the `calcifer` realm. This allows administration of the application realm without granting global access to the `master` realm.
+
+The Job name is versioned:
+
+```text
+keycloak-configure-v2
+```
+
+When the Job logic or managed configuration must be re-applied through GitOps after a completed run, bump the Job name, for example to `keycloak-configure-v3`.
+Completed Jobs are intentionally kept in the cluster so Flux does not recreate them on every reconciliation.

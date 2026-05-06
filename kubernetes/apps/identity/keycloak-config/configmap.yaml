@@ -1,0 +1,425 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-configurator
+  namespace: identity
+data:
+  realm-config.json: |
+    {
+      "realm": {
+        "realm": "calcifer",
+        "displayName": "Calcifer Lab",
+        "enabled": true,
+        "registrationAllowed": false,
+        "resetPasswordAllowed": true,
+        "rememberMe": true,
+        "loginWithEmailAllowed": true,
+        "duplicateEmailsAllowed": false,
+        "verifyEmail": false,
+        "sslRequired": "external",
+        "accessTokenLifespan": 300,
+        "ssoSessionIdleTimeout": 1800,
+        "ssoSessionMaxLifespan": 36000
+      },
+      "roles": [
+        {
+          "name": "user",
+          "description": "Default application user"
+        },
+        {
+          "name": "admin",
+          "description": "Application administrator"
+        }
+      ],
+      "groups": [
+        {
+          "name": "users",
+          "realmRoles": ["user"],
+          "realmManagementRoles": []
+        },
+        {
+          "name": "admins",
+          "realmRoles": ["admin", "user"],
+          "realmManagementRoles": ["realm-admin"]
+        }
+      ],
+      "users": [
+        {
+          "username": "dmgiangi",
+          "enabled": true,
+          "emailVerified": true,
+          "groups": ["admins"],
+          "initialPasswordFile": "/var/run/keycloak-bootstrap/test-user-password",
+          "temporaryPassword": true
+        }
+      ],
+      "clients": [
+        {
+          "clientId": "lab-console",
+          "name": "Lab Console",
+          "description": "OIDC client for local lab applications",
+          "enabled": true,
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": false,
+          "implicitFlowEnabled": false,
+          "redirectUris": [
+            "https://*.calcifer.tech/*"
+          ],
+          "webOrigins": [
+            "+"
+          ]
+        }
+      ],
+      "identityProviders": {
+        "google": {
+          "enabled": true,
+          "alias": "google",
+          "displayName": "Google",
+          "providerId": "google",
+          "clientId": "851650197434-uchg5tecamvamu0v66h5nv9g4unettnh.apps.googleusercontent.com",
+          "clientSecretFile": "/var/run/keycloak-idp/google-client-secret",
+          "trustEmail": true,
+          "syncMode": "IMPORT"
+        }
+      }
+    }
+  configure-keycloak.py: |
+    #!/usr/bin/env python3
+    import json
+    import os
+    import sys
+    import time
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    BASE_URL = os.environ.get("KEYCLOAK_BASE_URL", "http://identity-keycloak.identity.svc.cluster.local").rstrip("/")
+    ADMIN_REALM = os.environ.get("KEYCLOAK_ADMIN_REALM", "master")
+    ADMIN_USER = os.environ.get("KEYCLOAK_ADMIN_USER", "admin")
+    ADMIN_PASSWORD_FILE = os.environ.get("KEYCLOAK_ADMIN_PASSWORD_FILE", "/var/run/keycloak-admin/admin-password")
+    CONFIG_FILE = os.environ.get("KEYCLOAK_CONFIG_FILE", "/config/realm-config.json")
+    WAIT_TIMEOUT_SECONDS = int(os.environ.get("KEYCLOAK_WAIT_TIMEOUT_SECONDS", "300"))
+
+
+    class KeycloakError(RuntimeError):
+        pass
+
+
+    def log(message):
+        print(message, flush=True)
+
+
+    def read_text(path, required=True):
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                return handle.read().strip()
+        except FileNotFoundError:
+            if required:
+                raise
+            return ""
+
+
+    def request(method, path, token=None, body=None, form=None, expected=(200, 201, 204), allow_404=False):
+        url = BASE_URL + path
+        headers = {}
+        data = None
+
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+
+        if form is not None:
+            data = urllib.parse.urlencode(form).encode("utf-8")
+            headers["Content-Type"] = "application/x-www-form-urlencoded"
+        elif body is not None:
+            data = json.dumps(body).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=20) as response:
+                payload = response.read().decode("utf-8")
+                if response.status not in expected:
+                    raise KeycloakError(f"{method} {path} returned {response.status}: {payload}")
+                if not payload:
+                    return None
+                return json.loads(payload)
+        except urllib.error.HTTPError as exc:
+            payload = exc.read().decode("utf-8")
+            if allow_404 and exc.code == 404:
+                return None
+            raise KeycloakError(f"{method} {path} returned {exc.code}: {payload}") from exc
+
+
+    def wait_for_keycloak():
+        deadline = time.time() + WAIT_TIMEOUT_SECONDS
+        path = f"/realms/{ADMIN_REALM}"
+        while time.time() < deadline:
+            try:
+                request("GET", path)
+                log("keycloak: ready")
+                return
+            except Exception as exc:
+                log(f"keycloak: waiting for readiness: {exc}")
+                time.sleep(5)
+        raise KeycloakError(f"Keycloak did not become ready within {WAIT_TIMEOUT_SECONDS}s")
+
+
+    def admin_token():
+        password = read_text(ADMIN_PASSWORD_FILE)
+        response = request(
+            "POST",
+            f"/realms/{ADMIN_REALM}/protocol/openid-connect/token",
+            form={
+                "grant_type": "password",
+                "client_id": "admin-cli",
+                "username": ADMIN_USER,
+                "password": password,
+            },
+        )
+        return response["access_token"]
+
+
+    def get_realm(token, realm_name):
+        return request("GET", f"/admin/realms/{realm_name}", token=token, allow_404=True)
+
+
+    def sync_realm(token, realm_config):
+        realm_name = realm_config["realm"]
+        existing = get_realm(token, realm_name)
+        if existing is None:
+            request("POST", "/admin/realms", token=token, body=realm_config)
+            log(f"realm {realm_name}: created")
+        else:
+            merged = existing.copy()
+            merged.update(realm_config)
+            request("PUT", f"/admin/realms/{realm_name}", token=token, body=merged)
+            log(f"realm {realm_name}: updated")
+
+
+    def get_role(token, realm_name, role_name):
+        encoded = urllib.parse.quote(role_name, safe="")
+        return request("GET", f"/admin/realms/{realm_name}/roles/{encoded}", token=token, allow_404=True)
+
+
+    def sync_roles(token, realm_name, roles):
+        for role in roles:
+            existing = get_role(token, realm_name, role["name"])
+            if existing is None:
+                request("POST", f"/admin/realms/{realm_name}/roles", token=token, body=role)
+                log(f"role {role['name']}: created")
+            else:
+                merged = existing.copy()
+                merged.update(role)
+                request("PUT", f"/admin/realms/{realm_name}/roles/{urllib.parse.quote(role['name'], safe='')}", token=token, body=merged)
+                log(f"role {role['name']}: updated")
+
+
+    def find_group(token, realm_name, group_name):
+        groups = request("GET", f"/admin/realms/{realm_name}/groups?search={urllib.parse.quote(group_name)}", token=token) or []
+        for group in groups:
+            if group.get("name") == group_name:
+                return group
+        return None
+
+
+    def sync_group(token, realm_name, group):
+        existing = find_group(token, realm_name, group["name"])
+        if existing is None:
+            request("POST", f"/admin/realms/{realm_name}/groups", token=token, body={"name": group["name"]})
+            existing = find_group(token, realm_name, group["name"])
+            log(f"group {group['name']}: created")
+        else:
+            request("PUT", f"/admin/realms/{realm_name}/groups/{existing['id']}", token=token, body={"name": group["name"]})
+            log(f"group {group['name']}: updated")
+        return existing
+
+
+    def assign_realm_roles_to_group(token, realm_name, group_id, role_names, group_name):
+        current = request("GET", f"/admin/realms/{realm_name}/groups/{group_id}/role-mappings/realm", token=token) or []
+        current_names = {role["name"] for role in current}
+        missing = [get_role(token, realm_name, name) for name in role_names if name not in current_names]
+        missing = [role for role in missing if role is not None]
+        if missing:
+            request("POST", f"/admin/realms/{realm_name}/groups/{group_id}/role-mappings/realm", token=token, body=missing, expected=(204,))
+            log(f"group {group_name}: added realm roles {', '.join(role['name'] for role in missing)}")
+
+
+    def get_client(token, realm_name, client_id):
+        clients = request("GET", f"/admin/realms/{realm_name}/clients?clientId={urllib.parse.quote(client_id)}", token=token) or []
+        for client in clients:
+            if client.get("clientId") == client_id:
+                return client
+        return None
+
+
+    def sync_clients(token, realm_name, clients):
+        for client in clients:
+            existing = get_client(token, realm_name, client["clientId"])
+            if existing is None:
+                request("POST", f"/admin/realms/{realm_name}/clients", token=token, body=client)
+                log(f"client {client['clientId']}: created")
+            else:
+                merged = existing.copy()
+                merged.update(client)
+                request("PUT", f"/admin/realms/{realm_name}/clients/{existing['id']}", token=token, body=merged)
+                log(f"client {client['clientId']}: updated")
+
+
+    def get_client_role(token, realm_name, client_uuid, role_name):
+        return request("GET", f"/admin/realms/{realm_name}/clients/{client_uuid}/roles/{urllib.parse.quote(role_name, safe='')}", token=token, allow_404=True)
+
+
+    def assign_client_roles_to_group(token, realm_name, group_id, client_id, role_names, group_name):
+        client = get_client(token, realm_name, client_id)
+        if client is None:
+            raise KeycloakError(f"client {client_id} not found in realm {realm_name}")
+        current = request("GET", f"/admin/realms/{realm_name}/groups/{group_id}/role-mappings/clients/{client['id']}", token=token) or []
+        current_names = {role["name"] for role in current}
+        missing = [get_client_role(token, realm_name, client["id"], name) for name in role_names if name not in current_names]
+        missing = [role for role in missing if role is not None]
+        if missing:
+            request("POST", f"/admin/realms/{realm_name}/groups/{group_id}/role-mappings/clients/{client['id']}", token=token, body=missing, expected=(204,))
+            log(f"group {group_name}: added {client_id} roles {', '.join(role['name'] for role in missing)}")
+
+
+    def sync_groups(token, realm_name, groups):
+        for group in groups:
+            existing = sync_group(token, realm_name, group)
+            assign_realm_roles_to_group(token, realm_name, existing["id"], group.get("realmRoles", []), group["name"])
+            management_roles = group.get("realmManagementRoles", [])
+            if management_roles:
+                assign_client_roles_to_group(token, realm_name, existing["id"], "realm-management", management_roles, group["name"])
+
+
+    def get_user(token, realm_name, username):
+        users = request("GET", f"/admin/realms/{realm_name}/users?username={urllib.parse.quote(username)}&exact=true", token=token) or []
+        for user in users:
+            if user.get("username") == username:
+                return user
+        return None
+
+
+    def set_user_password(token, realm_name, user_id, password, temporary):
+        request(
+            "PUT",
+            f"/admin/realms/{realm_name}/users/{user_id}/reset-password",
+            token=token,
+            body={
+                "type": "password",
+                "value": password,
+                "temporary": bool(temporary),
+            },
+            expected=(204,),
+        )
+
+
+    def add_user_to_group(token, realm_name, user_id, group_name):
+        group = find_group(token, realm_name, group_name)
+        if group is None:
+            raise KeycloakError(f"group {group_name} not found in realm {realm_name}")
+
+        current_groups = request("GET", f"/admin/realms/{realm_name}/users/{user_id}/groups", token=token) or []
+        if any(current.get("id") == group["id"] for current in current_groups):
+            return
+
+        request("PUT", f"/admin/realms/{realm_name}/users/{user_id}/groups/{group['id']}", token=token, expected=(204,))
+        log(f"user group mapping: added {group_name}")
+
+
+    def sync_users(token, realm_name, users):
+        for user in users:
+            username = user["username"]
+            managed_user = {
+                "username": username,
+                "enabled": bool(user.get("enabled", True)),
+                "emailVerified": bool(user.get("emailVerified", False)),
+            }
+            for optional_field in ("email", "firstName", "lastName"):
+                if user.get(optional_field):
+                    managed_user[optional_field] = user[optional_field]
+
+            existing = get_user(token, realm_name, username)
+            if existing is None:
+                request("POST", f"/admin/realms/{realm_name}/users", token=token, body=managed_user)
+                existing = get_user(token, realm_name, username)
+                if existing is None:
+                    raise KeycloakError(f"user {username} was created but could not be read back")
+
+                password = read_text(user["initialPasswordFile"])
+                set_user_password(token, realm_name, existing["id"], password, user.get("temporaryPassword", True))
+                log(f"user {username}: created")
+            else:
+                merged = existing.copy()
+                merged.update(managed_user)
+                request("PUT", f"/admin/realms/{realm_name}/users/{existing['id']}", token=token, body=merged, expected=(204,))
+                log(f"user {username}: updated")
+
+            for group_name in user.get("groups", []):
+                add_user_to_group(token, realm_name, existing["id"], group_name)
+
+
+    def sync_google_idp(token, realm_name, google):
+        if not google.get("enabled"):
+            log("identity provider google: skipped")
+            return
+
+        client_id = google.get("clientId", "").strip()
+        client_secret = read_text(google.get("clientSecretFile", ""), required=False)
+        if not client_id or not client_secret:
+            raise KeycloakError("Google identity provider is enabled but clientId or clientSecret is missing")
+
+        alias = google.get("alias", "google")
+        body = {
+            "alias": alias,
+            "displayName": google.get("displayName", "Google"),
+            "providerId": google.get("providerId", "google"),
+            "enabled": True,
+            "trustEmail": bool(google.get("trustEmail", True)),
+            "storeToken": False,
+            "addReadTokenRoleOnCreate": False,
+            "config": {
+                "clientId": client_id,
+                "clientSecret": client_secret,
+                "syncMode": google.get("syncMode", "IMPORT"),
+                "useJwksUrl": "true",
+            },
+        }
+
+        existing = request("GET", f"/admin/realms/{realm_name}/identity-provider/instances/{urllib.parse.quote(alias, safe='')}", token=token, allow_404=True)
+        if existing is None:
+            request("POST", f"/admin/realms/{realm_name}/identity-provider/instances", token=token, body=body)
+            log("identity provider google: created")
+        else:
+            merged = existing.copy()
+            merged.update(body)
+            request("PUT", f"/admin/realms/{realm_name}/identity-provider/instances/{urllib.parse.quote(alias, safe='')}", token=token, body=merged)
+            log("identity provider google: updated")
+
+
+    def main():
+        with open(CONFIG_FILE, "r", encoding="utf-8") as handle:
+            config = json.load(handle)
+
+        wait_for_keycloak()
+        token = admin_token()
+
+        realm = config["realm"]
+        realm_name = realm["realm"]
+        sync_realm(token, realm)
+        sync_roles(token, realm_name, config.get("roles", []))
+        sync_clients(token, realm_name, config.get("clients", []))
+        sync_groups(token, realm_name, config.get("groups", []))
+        sync_users(token, realm_name, config.get("users", []))
+        sync_google_idp(token, realm_name, config.get("identityProviders", {}).get("google", {}))
+
+        log("keycloak configuration: completed")
+
+
+    if __name__ == "__main__":
+        try:
+            main()
+        except Exception as exc:
+            print(f"keycloak configuration failed: {exc}", file=sys.stderr, flush=True)
+            sys.exit(1)
