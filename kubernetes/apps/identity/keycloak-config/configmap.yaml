@@ -47,11 +47,30 @@ data:
       "users": [
         {
           "username": "dmgiangi",
+          "email": "dem.gianluigi@gmail.com",
+          "firstName": "Gianluigi",
+          "lastName": "De Marco",
           "enabled": true,
           "emailVerified": true,
           "groups": ["admins"],
           "initialPasswordFile": "/var/run/keycloak-bootstrap/test-user-password",
           "temporaryPassword": true
+        }
+      ],
+      "brokerLoginFlows": [
+        {
+          "alias": "calcifer auto link existing user",
+          "description": "Automatically links trusted Google accounts to pre-created users with matching email",
+          "executions": [
+            {
+              "provider": "idp-detect-existing-broker-user",
+              "requirement": "REQUIRED"
+            },
+            {
+              "provider": "idp-auto-link",
+              "requirement": "REQUIRED"
+            }
+          ]
         }
       ],
       "clients": [
@@ -80,8 +99,9 @@ data:
           "providerId": "google",
           "clientId": "851650197434-uchg5tecamvamu0v66h5nv9g4unettnh.apps.googleusercontent.com",
           "clientSecretFile": "/var/run/keycloak-idp/google-client-secret",
+          "firstBrokerLoginFlowAlias": "calcifer auto link existing user",
           "trustEmail": true,
-          "syncMode": "IMPORT"
+          "syncMode": "FORCE"
         }
       }
     }
@@ -360,6 +380,76 @@ data:
                 add_user_to_group(token, realm_name, existing["id"], group_name)
 
 
+    def get_authentication_flow(token, realm_name, alias):
+        return request("GET", f"/admin/realms/{realm_name}/authentication/flows/{urllib.parse.quote(alias, safe='')}", token=token, allow_404=True)
+
+
+    def get_flow_executions(token, realm_name, alias):
+        return request("GET", f"/admin/realms/{realm_name}/authentication/flows/{urllib.parse.quote(alias, safe='')}/executions", token=token) or []
+
+
+    def add_flow_execution(token, realm_name, alias, provider):
+        request(
+            "POST",
+            f"/admin/realms/{realm_name}/authentication/flows/{urllib.parse.quote(alias, safe='')}/executions/execution",
+            token=token,
+            body={"provider": provider},
+            expected=(201, 204),
+        )
+
+
+    def set_flow_execution_requirement(token, realm_name, alias, execution, requirement):
+        updated = execution.copy()
+        updated["requirement"] = requirement
+        request(
+            "PUT",
+            f"/admin/realms/{realm_name}/authentication/flows/{urllib.parse.quote(alias, safe='')}/executions",
+            token=token,
+            body=updated,
+            expected=(200, 204),
+        )
+
+
+    def sync_broker_login_flows(token, realm_name, flows):
+        for flow in flows:
+            alias = flow["alias"]
+            existing = get_authentication_flow(token, realm_name, alias)
+            if existing is None:
+                request(
+                    "POST",
+                    f"/admin/realms/{realm_name}/authentication/flows",
+                    token=token,
+                    body={
+                        "alias": alias,
+                        "description": flow.get("description", ""),
+                        "providerId": "basic-flow",
+                        "topLevel": True,
+                        "builtIn": False,
+                    },
+                    expected=(201, 204),
+                )
+                log(f"broker login flow {alias}: created")
+            else:
+                log(f"broker login flow {alias}: exists")
+
+            executions = get_flow_executions(token, realm_name, alias)
+            for wanted in flow.get("executions", []):
+                provider = wanted["provider"]
+                requirement = wanted.get("requirement", "REQUIRED")
+                execution = next((candidate for candidate in executions if candidate.get("providerId") == provider), None)
+                if execution is None:
+                    add_flow_execution(token, realm_name, alias, provider)
+                    executions = get_flow_executions(token, realm_name, alias)
+                    execution = next((candidate for candidate in executions if candidate.get("providerId") == provider), None)
+                    if execution is None:
+                        raise KeycloakError(f"broker login flow {alias}: execution {provider} was added but could not be read back")
+                    log(f"broker login flow {alias}: added execution {provider}")
+
+                if execution.get("requirement") != requirement:
+                    set_flow_execution_requirement(token, realm_name, alias, execution, requirement)
+                    log(f"broker login flow {alias}: set {provider} to {requirement}")
+
+
     def sync_google_idp(token, realm_name, google):
         if not google.get("enabled"):
             log("identity provider google: skipped")
@@ -379,6 +469,7 @@ data:
             "trustEmail": bool(google.get("trustEmail", True)),
             "storeToken": False,
             "addReadTokenRoleOnCreate": False,
+            "firstBrokerLoginFlowAlias": google.get("firstBrokerLoginFlowAlias"),
             "config": {
                 "clientId": client_id,
                 "clientSecret": client_secret,
@@ -412,6 +503,7 @@ data:
         sync_clients(token, realm_name, config.get("clients", []))
         sync_groups(token, realm_name, config.get("groups", []))
         sync_users(token, realm_name, config.get("users", []))
+        sync_broker_login_flows(token, realm_name, config.get("brokerLoginFlows", []))
         sync_google_idp(token, realm_name, config.get("identityProviders", {}).get("google", {}))
 
         log("keycloak configuration: completed")

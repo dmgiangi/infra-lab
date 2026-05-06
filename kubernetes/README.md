@@ -245,9 +245,12 @@ groups: users, admins
 local test user: dmgiangi
 client: lab-console
 google identity provider: enabled
+google first login flow: auto-link trusted existing user by email
 ```
 
 The `admins` group receives both application roles and the `realm-management/realm-admin` client role inside the `calcifer` realm. This allows administration of the application realm without granting global access to the `master` realm.
+
+The Google first login flow is configured to automatically link trusted Google identities to pre-created local users when the email address matches. Do not enable self-registration with this flow unless the trust model is reviewed.
 
 The Google OAuth client must allow this redirect URI:
 
@@ -258,8 +261,8 @@ https://auth.calcifer.tech/realms/calcifer/broker/google/endpoint
 The Job name is versioned:
 
 ```text
-keycloak-configure-v2
+keycloak-configure-v3
 ```
 
-When the Job logic or managed configuration must be re-applied through GitOps after a completed run, bump the Job name, for example to `keycloak-configure-v3`.
+When the Job logic or managed configuration must be re-applied through GitOps after a completed run, bump the Job name, for example to `keycloak-configure-v4`.
 Completed Jobs are intentionally kept in the cluster so Flux does not recreate them on every reconciliation.
